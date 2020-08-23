@@ -92,7 +92,7 @@ def SellCryptoImmediately():
     price = r.get_crypto_quote('LTC')
     askprice = float(price['ask_price'])
     print('Asking: ' + str(askprice))
-    print(r.order_sell_crypto_by_price('LTC', paid))
+    print(r.order_sell_crypto_by_quantity('LTC', QuantityAvailable))
     print('Order placed!')
     print('')
     t.sleep(5)
@@ -107,11 +107,11 @@ SellWinStreak = 0
 SellLoseStreak = 0
 BuyWinStreak = 0
 BuyLoseStreak = 0
-TimeInterval = 30  # Minutes
+TimeInterval = 20  # Minutes
 BasePercent = 0.001
 BetAmount = 10.00  # USD
 LoseStreakToQuit = 5
-WinStreakToCap = 5
+WinStreakToCap = 3
 
 while True:
     crypto_positions = r.get_crypto_positions()
@@ -134,9 +134,10 @@ while True:
         Quantity = float(LTCData['quantity'])
         if Quantity > 0.00:  # Bet was lost
             print('Crypto was not sold. Sad stonk hours.')
-            r.cancel_all_crypto_orders()
             if SellWinStreak > 0:  # Break the streak but reset and try again
                 print('Resetting win streak and trying again.')
+                r.cancel_all_crypto_orders()
+                t.sleep(5)
                 SellWinStreak = 0
                 SellCryptoBet()
                 t.sleep(60 * TimeInterval)
@@ -148,8 +149,9 @@ while True:
                 quantity = float(LTCData['quantity'])
                 if quantity > 0.00:  # Bet was lost again
                     print('Crypto was not sold. Sell at current price and move on with your life.')
-                    r.cancel_all_crypto_orders()
                     print('')
+                    r.cancel_all_crypto_orders()
+                    t.sleep(5)
                     SellCryptoImmediately()
                     SellLoseStreak += 1
                     if SellLoseStreak >= LoseStreakToQuit:
@@ -160,10 +162,12 @@ while True:
                     print('')
                     if SellWinStreak < WinStreakToCap:
                         SellWinStreak += 1
-                    SellLoseStreak = 0  # Loop back
+                    SellLoseStreak = 0
             else:  # No streak, take the L
                 print('No streak. Sell at current price and move on with your life.')
                 print('')
+                r.cancel_all_crypto_orders()
+                t.sleep(5)
                 SellCryptoImmediately()
                 SellWinStreak = 0
                 SellLoseStreak += 1
@@ -190,9 +194,10 @@ while True:
         QuantityAvailable = float(LTCData['quantity_available'])
         if QuantityAvailable <= 0.00:  # Bet was lost
             print('Crypto was not bought. Sad stonk hours.')
-            r.cancel_all_crypto_orders()
             if BuyWinStreak > 0:  # Break the streak but reset and try again
                 print('Resetting win streak and trying again.')
+                r.cancel_all_crypto_orders()
+                t.sleep(5)
                 BuyWinStreak = 0
                 BuyCryptoBet()
                 t.sleep(60 * TimeInterval)
@@ -206,28 +211,27 @@ while True:
                     print('Crypto was not bought. Buy at current price and move on with your life.')
                     print('')
                     r.cancel_all_crypto_orders()
+                    t.sleep(5)
                     BuyWinStreak = 0
                     BuyLoseStreak += 1
                     BuyCryptoImmediately()
-                    # Loop back
                 else:
                     print('Crypto was bought! Yay!')
                     print('')
                     if BuyWinStreak < WinStreakToCap:
                         BuyWinStreak += 1
                     BuyLoseStreak = 0
-                    # Loop back
             else:  # No streak, take the L
                 print('No streak. Buy at current price and move on with your life.')
                 print('')
+                r.cancel_all_crypto_orders()
+                t.sleep(5)
                 BuyWinStreak = 0
                 BuyLoseStreak += 1
                 BuyCryptoImmediately()
-                # Loop back
         else:  # Bet was won
             print('Crypto was bought! Yay!')
             print('')
             if BuyWinStreak < WinStreakToCap:
                 BuyWinStreak += 1
             BuyLoseStreak = 0
-            # Loop back
