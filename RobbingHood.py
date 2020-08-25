@@ -21,10 +21,10 @@ def GetQuantityAvailable():
 
 
 def GetQuantity():
-    pos = r.get_crypto_positions()
-    for i in pos:
-        if i['currency']['code'] == 'LTC':
-            data = i
+    positions = r.get_crypto_positions(info='quantity')
+    for p in positions:
+        if p['currency']['code'] == 'LTC':
+            data = p
     return float(data['quantity'])
 
 
@@ -34,6 +34,17 @@ def GetBet():
         if i['currency']['code'] == 'LTC':
             data = i
     return float(data['cost_bases'][0]['direct_cost_basis'])
+
+
+def GetState(orderid):
+    print('Loading profile...')
+    r.load_crypto_profile()
+    print('Fetching order info...')
+    order = r.get_crypto_order_info(orderid)
+    print(order)
+    print('Returning state...')
+    print(order['state'])
+    return order['state']
 
 
 def SellCryptoBet():
@@ -50,13 +61,19 @@ def SellCryptoBet():
     print('Bet percentage: ' + str(betpercentage))
     sellprice = round(priceboughtat * (1.000 + betpercentage), 2)
     print('Selling at: ' + str(sellprice))
-    print(r.order_sell_crypto_limit('LTC', quantityavailable, sellprice, 'gtc'))
+    orderinfo = (r.order_sell_crypto_limit('LTC', quantityavailable, sellprice, 'gtc'))
     print('Order placed!')
     print('')
-    Wait(True, False)
+    orderid = orderinfo['id']
+    success = Wait(orderid, False)
     print('Checking sell results...')
-    quantity = GetQuantity()
-    return quantity == 0.00
+    if not success:
+        r.cancel_crypto_order(orderid)
+        print('Sell failure.')
+    else:
+        print('Sell success!')
+    print('')
+    return success
 
 
 def BuyCryptoBet():
@@ -71,13 +88,19 @@ def BuyCryptoBet():
     print('Buying at: ' + str(buyprice))
     buyquantity = round(BetAmount / buyprice, 8)  # Amount of money we're spending / asking price of coin
     print('Quantity buying: ' + str(buyquantity))
-    print(r.order_buy_crypto_limit('LTC', buyquantity, buyprice))
+    orderinfo = r.order_buy_crypto_limit('LTC', buyquantity, buyprice)
+    orderid = orderinfo['id']
     print('Order placed!')
     print('')
-    Wait(False, False)
+    success = Wait(orderid, False)
     print('Checking buy results...')
-    quantityavailable = GetQuantityAvailable()
-    return quantityavailable > 0.00
+    if not success:
+        r.cancel_crypto_order(orderid)
+        print('Buy failure.')
+    else:
+        print('Buy success!')
+    print('')
+    return success
 
 
 def BuyCryptoImmediately():
@@ -88,9 +111,10 @@ def BuyCryptoImmediately():
     price = r.get_crypto_quote('LTC')
     askprice = float(price['ask_price'])
     print('Asking: ' + str(askprice))
-    print(r.order_buy_crypto_by_price('LTC', BetAmount))
+    orderinfo = r.order_buy_crypto_by_price('LTC', BetAmount)
+    orderid = orderinfo['id']
     print('Order placed!')
-    Wait(False, True)
+    Wait(orderid, True)
     print('Bought!')
     print('')
 
@@ -111,45 +135,33 @@ def SellCryptoImmediately():
     loss = askprice / priceboughtat * 100
     loss = round(loss * priceboughtat, 2)
     print('Estimated loss: ' + str(loss))
-    print(r.order_sell_crypto_by_quantity('LTC', quantityavailable))
+    orderinfo = r.order_sell_crypto_by_quantity('LTC', quantityavailable)
+    orderid = orderinfo['id']
     print('Order placed!')
-    Wait(True, True)
+    Wait(orderid, True)
     print('Sold!')
     print('')
 
 
-def Wait(issale, isimmediate):
-    time = 0
-    if issale:  # Sale
-        quantity = GetQuantity()
-        if isimmediate:
-            while quantity != 0:
-                print('Waiting for ' + str(quantity) + ' to sell...')
+def Wait(orderid, immediate):
+    if immediate:
+        state = GetState(orderid)
+        while state != 'filled':
+            print('Waiting for order to fulfill...')
+            t.sleep(60)
+            state = GetState(orderid)
+        return True
+    else:
+        time = 0
+        state = GetState(orderid)
+        while time < TimeInterval:
+            if state != 'filled':
                 t.sleep(60)
-                quantity = GetQuantity()
-        else:
-            while time < TimeInterval:
-                if quantity != 0:  # No sale
-                    t.sleep(60)
-                    time += 60
-                    quantity = GetQuantity()
-                else:
-                    break
-    else:  # Buy
-        quantityavailable = GetQuantityAvailable()
-        if isimmediate:
-            while quantityavailable == 0:
-                print('Waiting for coin to be bought...')
-                t.sleep(60)
-                quantityavailable = GetQuantityAvailable()
-        else:
-            while time < TimeInterval:
-                if quantityavailable == 0:  # No buy
-                    t.sleep(60)
-                    time += 60
-                    quantityavailable = GetQuantityAvailable()
-                else:
-                    break
+                time += 60
+                state = GetState(orderid)
+            else:
+                return True
+        return False
 
 
 # Here we go
@@ -157,68 +169,50 @@ def Wait(issale, isimmediate):
 Login()
 r.cancel_all_crypto_orders()
 t.sleep(5)
+QuantityAvailable = GetQuantityAvailable()
+if QuantityAvailable > 0.00:
+    print('Selling all existing coin..')
+    SellCryptoImmediately()
 SellWinStreak = 0
 SellLoseStreak = 0
 TimeInterval = 2400  # Seconds
 BasePercent = 0.0015
 BetAmount = 20.00  # USD
-LoseStreakToQuit = 5
+LoseStreakToQuit = 4
 WinStreakToCap = 3
 
 while True:
-    QuantityAvailable = GetQuantityAvailable()
-    Quantity = GetQuantity()
-    if QuantityAvailable > 0.00:
-        # Sell procedure
-        sold = SellCryptoBet()
-        if not sold:  # Bet was lost
-            print('No sale. Sad stonk hours.')
-            if SellWinStreak > 0:  # Break the streak but reset and try again
-                print('Resetting win streak and trying again...')
-                print('')
-                r.cancel_all_crypto_orders()
-                SellWinStreak = 0
-                sold = SellCryptoBet()
-                if not sold:  # Bet was lost again
-                    print('No sale. Sell at current price and move on with your life.')
-                    print('')
-                    r.cancel_all_crypto_orders()
-                    SellCryptoImmediately()
-                    SellLoseStreak += 1
-                    if SellLoseStreak >= LoseStreakToQuit:
-                        print('Too much loss, throwing a fit and stopping bets.')
-                        SystemExit(0)
-                else:
-                    print('Sold! Yay!')
-                    print('')
-                    if SellWinStreak < WinStreakToCap:
-                        SellWinStreak += 1
-                    SellLoseStreak = 0
-            else:  # No streak, take the L
-                print('No streak. Sell at current price and move on.')
-                print('')
-                r.cancel_all_crypto_orders()
-                SellCryptoImmediately()
-                SellWinStreak = 0
-                SellLoseStreak += 1
-                if SellLoseStreak >= LoseStreakToQuit:
-                    print('Too much loss, throwing a fit and stopping bets.')
-                    SystemExit(0)
-        else:  # Bet was won
-            print('Sold! Yay!')
-            print('')
-            if SellWinStreak < WinStreakToCap:
-                SellWinStreak += 1
-            SellLoseStreak = 0
+    # Buy procedure
+    bought = BuyCryptoBet()
+    if not bought:  # Bet was lost
+        print('Buy at current asking price and move on.')
+        print('')
+        BuyCryptoImmediately()
 
-    else:  # No stonks, let's buy
-        bought = BuyCryptoBet()
-        if not bought:  # Bet was lost
-            print('Crypto was not bought. Sad stonk hours.')
-            print('Buy at current asking price and move on.')
+    # Sell procedure
+    sold = SellCryptoBet()
+    if not sold:  # Bet was lost
+        if SellWinStreak > 0:  # Break the streak but reset and try again
+            print('Resetting win streak and trying again...')
             print('')
-            r.cancel_all_crypto_orders()
-            BuyCryptoImmediately()
-        else:  # Bet was won
-            print('Crypto was bought! Yay!')
+            SellWinStreak = 0
+            sold = SellCryptoBet()
+            if not sold:  # Bet was lost again
+                print('Sell at current price and move on.')
+                print('')
+                SellCryptoImmediately()
+                SellLoseStreak += 1
+                if SellWinStreak < WinStreakToCap:
+                    SellWinStreak += 1
+                SellLoseStreak = 0
+        else:  # No streak, take the L
+            print('No streak. Sell at current price and move on.')
             print('')
+            SellCryptoImmediately()
+            SellWinStreak = 0
+            SellLoseStreak += 1
+
+    # Check losses
+    if SellLoseStreak >= LoseStreakToQuit:
+        print('Too much loss, throwing a fit and stopping bets.')
+        SystemExit(0)
