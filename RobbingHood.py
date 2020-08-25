@@ -16,29 +16,29 @@ def GetQuantityAvailable():
     pos = r.get_crypto_positions()
     for i in pos:
         if i['currency']['code'] == 'LTC':
-            data = i
-    return float(data['quantity_available'])
+            return float(i['quantity_available'])
+    return -1.0
 
 
 def GetQuantity():
-    positions = r.get_crypto_positions(info='quantity')
-    for p in positions:
-        if p['currency']['code'] == 'LTC':
-            data = p
-    return float(data['quantity'])
+    pos = r.get_crypto_positions(info='quantity')
+    for i in pos:
+        if i['currency']['code'] == 'LTC':
+            return float(i['quantity'])
+    return -1.0
 
 
 def GetBet():
     pos = r.get_crypto_positions()
     for i in pos:
         if i['currency']['code'] == 'LTC':
-            data = i
-    return float(data['cost_bases'][0]['direct_cost_basis'])
+            return float(i['cost_bases'][0]['direct_cost_basis'])
+    return -1.0
 
 
 def GetState(orderid):
     print('Loading profile...')
-    r.load_crypto_profile()
+    Login()
     print('Fetching order info...')
     order = r.get_crypto_order_info(orderid)
     print(order)
