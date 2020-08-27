@@ -76,7 +76,7 @@ def SellCryptoBet():
     return success
 
 
-def BuyCryptoBet():
+def BuyCryptoBet(bet):
     """Places a bet to buy an amount of crypto at a lower price than the current asking."""
 
     print('Starting buy procedure.')
@@ -86,7 +86,7 @@ def BuyCryptoBet():
     betpercentage = BasePercent
     buyprice = round(askprice * (1.000 - betpercentage), 2)
     print('Buying at: ' + str(buyprice))
-    buyquantity = round(BetAmount / buyprice, 8)  # Amount of money we're spending / asking price of coin
+    buyquantity = round(bet / buyprice, 8)  # Amount of money we're spending / asking price of coin
     print('Quantity buying: ' + str(buyquantity))
     orderinfo = r.order_buy_crypto_limit('LTC', buyquantity, buyprice)
     orderid = orderinfo['id']
@@ -103,15 +103,15 @@ def BuyCryptoBet():
     return success
 
 
-def BuyCryptoImmediately():
+def BuyCryptoImmediately(bet):
     """Buys crypto immediately at the current asking price."""
 
     print('Starting Immediate Buy procedure...')
-    print('Money to bet: ' + str(BetAmount))
+    print('Money to bet: ' + str(bet))
     price = r.get_crypto_quote('LTC')
     askprice = float(price['ask_price'])
     print('Asking: ' + str(askprice))
-    orderinfo = r.order_buy_crypto_by_price('LTC', BetAmount)
+    orderinfo = r.order_buy_crypto_by_price('LTC', bet)
     orderid = orderinfo['id']
     print('Order placed!')
     Wait(orderid, True)
@@ -144,6 +144,7 @@ def SellCryptoImmediately():
 
 
 def Wait(orderid, immediate):
+    """Waits until TimeInterval is reached or order is filled. If immediate, run forever (should trigger immediately)."""
     if immediate:
         state = GetState(orderid)
         while state != 'filled':
@@ -164,6 +165,44 @@ def Wait(orderid, immediate):
         return False
 
 
+def StartCryptoContract():
+    """Takes current coin and makes limit order to sell above purchased price"""
+
+    print('Starting contract creation procedure...')
+    quantityavailable = GetQuantityAvailable()
+    print('Quantity available: ' + str(quantityavailable))
+    paid = GetBet()
+    priceboughtat = round(paid / quantityavailable, 2)
+    print('Bought at: ' + str(priceboughtat))
+    sellprice = round(priceboughtat * (1.000 + BasePercent), 2)
+    print('Selling at: ' + str(sellprice))
+    orderinfo = (r.order_sell_crypto_limit('LTC', quantityavailable, sellprice, 'gtc'))
+    print('Contract created!')
+    print('')
+    orderid = orderinfo['id']
+    return orderid
+
+
+def ContractWait():
+    """Waits until TimeInterval is reached or a contract is sold. Periodically checks contracts"""
+
+    time = 0
+    while time < TimeInterval:
+        remove = []
+        for contract in Contracts:
+            if GetState(contract) == 'filled':
+                print('Contract sold!')
+                remove.append(contract)
+        if len(remove) > 0:
+            for contract in remove:
+                Contracts.remove(contract)
+            return True
+        else:
+            t.sleep(60)
+            time += 60
+    return False
+
+
 # Here we go
 # Cancel orders and reset quantity
 print('Booting up degen DeFi strategies....')
@@ -180,11 +219,11 @@ QuantityAvailable = GetQuantityAvailable()
 if QuantityAvailable > 0.00:
     print('Selling all existing coin..')
     SellCryptoImmediately()
-
 print('')
-print('Which gambling strategy would you like to lose money on today?')
+print('Which gambling strategy would you like to lose money with today?')
 print('1 - Vanilla')
 print('2 - Pseudo Stop Loss\n')
+print('3 - Puts all of your available funds into $TSLA calls')
 choice = input('')
 print('')
 
@@ -202,18 +241,16 @@ if choice == '1':
 
     while True:
         # Buy procedure
-        bought = BuyCryptoBet()
+        bought = BuyCryptoBet(BetAmount)
         if not bought:  # Bet was lost
-            print('Buy at current asking price and move on.')
-            print('')
-            BuyCryptoImmediately()
+            print('Buy at current asking price and move on.\n')
+            BuyCryptoImmediately(BetAmount)
 
         # Sell procedure
         sold = SellCryptoBet()
         if not sold:  # Bet was lost
             if SellWinStreak > 0:  # Break the streak but reset and try again
-                print('Resetting win streak and trying again...')
-                print('')
+                print('Resetting win streak and trying again...\n')
                 SellWinStreak = 0
                 sold = SellCryptoBet()
                 if not sold:  # Bet was lost again
@@ -233,10 +270,40 @@ if choice == '1':
         if SellLoseStreak >= LoseStreakToQuit:
             print('Too much loss, throwing a fit and stopping bets.')
             SystemExit(-666)
-
 elif choice == '2':
     print('Welcome to Pseudo Stop Loss.')
     print('Pseudo because it won''t actually stop losses.\n')
+
+    ActiveContracts = 0
+    MaxContracts = 5
+    BetAmount = 10.00
+    BasePercent = 0.0020
+    LoseStreakToQuit = 4
+    LoseStreak = 0
+    TimeInterval = 2400  # Seconds
+    Contracts = [5]
+
+    while True:
+        if ActiveContracts < MaxContracts:  # Add a contract
+            print('Let''s add a contract.')
+            BuyCryptoImmediately(BetAmount)
+            Contracts.append(StartCryptoContract())
+            sold = ContractWait()  # Let contract(s) cook
+            ActiveContracts = len(Contracts)
+            if sold:
+                LoseStreak = 0
+            print('')
+        else:  # Max contracts, drop one
+            print('Let''s drop a contract.')
+            r.cancel_crypto_order(Contracts[0])
+            Contracts = Contracts[1:4]
+            ActiveContracts -= 1
+            LoseStreak += 1
+            print('')
+            # Check losses
+            if LoseStreak >= LoseStreakToQuit:
+                print('Too much loss, throwing a fit and stopping bets.')
+                SystemExit(-666)
 else:
-    print('Idk how you managed to fuck that up. Don''t ever buy stonks.')
+    print('Idk how you managed to fuck that up but I''m leaving.')
     exit(-69)
