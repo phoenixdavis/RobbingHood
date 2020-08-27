@@ -166,53 +166,77 @@ def Wait(orderid, immediate):
 
 # Here we go
 # Cancel orders and reset quantity
+print('Booting up degen DeFi strategies....')
+t.sleep(2)
+print('Taunting Warren Buffett...')
+t.sleep(2)
+print('Making money printer go brrr..')
+t.sleep(2)
 Login()
+print('We''re in.')
 r.cancel_all_crypto_orders()
 t.sleep(5)
 QuantityAvailable = GetQuantityAvailable()
 if QuantityAvailable > 0.00:
     print('Selling all existing coin..')
     SellCryptoImmediately()
-SellWinStreak = 0
-SellLoseStreak = 0
-TimeInterval = 2400  # Seconds
-BasePercent = 0.0015
-BetAmount = 20.00  # USD
-LoseStreakToQuit = 4
-WinStreakToCap = 3
 
-while True:
-    # Buy procedure
-    bought = BuyCryptoBet()
-    if not bought:  # Bet was lost
-        print('Buy at current asking price and move on.')
-        print('')
-        BuyCryptoImmediately()
+print('')
+print('Which gambling strategy would you like to lose money on today?')
+print('1 - Vanilla')
+print('2 - Pseudo Stop Loss\n')
+choice = input('')
+print('')
 
-    # Sell procedure
-    sold = SellCryptoBet()
-    if not sold:  # Bet was lost
-        if SellWinStreak > 0:  # Break the streak but reset and try again
-            print('Resetting win streak and trying again...')
+if choice == '1':
+    print('Welcome to Vanilla.')
+    print('Reliable, but not as good as you remember.\n')
+
+    SellWinStreak = 0
+    SellLoseStreak = 0
+    TimeInterval = 2400  # Seconds
+    BasePercent = 0.0015
+    BetAmount = 20.00  # USD
+    LoseStreakToQuit = 4
+    WinStreakToCap = 3
+
+    while True:
+        # Buy procedure
+        bought = BuyCryptoBet()
+        if not bought:  # Bet was lost
+            print('Buy at current asking price and move on.')
             print('')
-            SellWinStreak = 0
-            sold = SellCryptoBet()
-            if not sold:  # Bet was lost again
-                print('Sell at current price and move on.')
+            BuyCryptoImmediately()
+
+        # Sell procedure
+        sold = SellCryptoBet()
+        if not sold:  # Bet was lost
+            if SellWinStreak > 0:  # Break the streak but reset and try again
+                print('Resetting win streak and trying again...')
                 print('')
+                SellWinStreak = 0
+                sold = SellCryptoBet()
+                if not sold:  # Bet was lost again
+                    print('Sell at current price and move on.\n')
+                    SellCryptoImmediately()
+                    SellLoseStreak += 1
+                    if SellWinStreak < WinStreakToCap:
+                        SellWinStreak += 1
+                    SellLoseStreak = 0
+            else:  # No streak, take the L
+                print('No streak. Admitting defeat.\n')
                 SellCryptoImmediately()
+                SellWinStreak = 0
                 SellLoseStreak += 1
-                if SellWinStreak < WinStreakToCap:
-                    SellWinStreak += 1
-                SellLoseStreak = 0
-        else:  # No streak, take the L
-            print('No streak. Sell at current price and move on.')
-            print('')
-            SellCryptoImmediately()
-            SellWinStreak = 0
-            SellLoseStreak += 1
 
-    # Check losses
-    if SellLoseStreak >= LoseStreakToQuit:
-        print('Too much loss, throwing a fit and stopping bets.')
-        SystemExit(0)
+        # Check losses
+        if SellLoseStreak >= LoseStreakToQuit:
+            print('Too much loss, throwing a fit and stopping bets.')
+            SystemExit(-666)
+
+elif choice == '2':
+    print('Welcome to Pseudo Stop Loss.')
+    print('Pseudo because it won''t actually stop losses.\n')
+else:
+    print('Idk how you managed to fuck that up. Don''t ever buy stonks.')
+    exit(-69)

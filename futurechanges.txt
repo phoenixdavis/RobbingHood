@@ -1,0 +1,30 @@
+Current strategy: Betting
+    Buying:
+        Check current price
+        Bet it will go down A percentage in B minutes (use limit order)
+        Check every minute if order is fulfilled
+        After B minutes stop
+            If bought, we won the bet
+            If not bought, we lost the bet. Cancel the bet
+                Buy at current price
+    Selling:
+        Buy coin using buy procedure
+        Bet it will go up A percentage in B minutes (use limit order)
+        After B minutes check
+            If sold, we won the bet
+                Increment Sell win counter, next time increase A percentage by # of wins (up to a threshold)
+                Reset Sell loss counter
+            If not sold, we lost. Cancel the bet
+                If on a win streak, reset percentage and try again
+                If not, sell at current price
+                    Reset Sell win counter
+                    Incremement Sell loss counter
+                        Check losses, if we have lost E times in a row, pause betting
+
+Additional Strategy to implement: Trailing Stop Loss
+    Buy X amount of coin Y percentage under current
+    Place sell order at Y percentage above bought price
+    Wait Z amount of time, then repeat until A amount of contracts are held (piled up)
+        Once pileup, possible options
+            Take oldest contract and sell it (Tracks most recent)
+                Log losses and set a new contract
