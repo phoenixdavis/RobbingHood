@@ -15,25 +15,25 @@ def Login():
 def GetQuantityAvailable():
     pos = r.get_crypto_positions()
     for i in pos:
-        if i['currency']['code'] == 'BTC':
+        if i['currency']['code'] == CryptoSymbol:
             quantity = float(i['quantity_available'])
-            return quantity // 0.00000001 / 100000000
+            return quantity
     return -1.0
 
 
 def GetQuantity():
     pos = r.get_crypto_positions()
     for i in pos:
-        if i['currency']['code'] == 'BTC':
+        if i['currency']['code'] == CryptoSymbol:
             quantity = float(i['quantity'])
-            return quantity // 0.00000001 / 100000000
+            return quantity
     return -1.0
 
 
 def GetBet():
     pos = r.get_crypto_positions()
     for i in pos:
-        if i['currency']['code'] == 'BTC':
+        if i['currency']['code'] == CryptoSymbol:
             return float(i['cost_bases'][0]['direct_cost_basis'])
     return -1.0
 
@@ -60,10 +60,10 @@ def SellCryptoBet():
     print('Bet percentage: ' + str(betpercentage))
     sellprice = round(priceboughtat * (1.000 + betpercentage), 2)
     print('Selling at: ' + str(sellprice))
-    price = r.get_crypto_quote('BTC')
+    price = r.get_crypto_quote(CryptoSymbol)
     askprice = float(price['ask_price'])
     print('Current asking: ' + str(askprice))
-    orderinfo = (r.order_sell_crypto_limit('BTC', quantityavailable, sellprice, 'gtc'))
+    orderinfo = (r.order_sell_crypto_limit(CryptoSymbol, quantityavailable, sellprice, 'gtc'))
     print('Order placed!')
     print('')
     orderid = orderinfo['id']
@@ -82,7 +82,7 @@ def BuyCryptoBet(bet):
     """Places a bet to buy an amount of crypto at a lower price than the current asking."""
 
     print('Starting buy procedure.')
-    price = r.get_crypto_quote('BTC')
+    price = r.get_crypto_quote(CryptoSymbol)
     askprice = float(price['ask_price'])
     print('Asking: ' + str(askprice))
     betpercentage = BasePercent
@@ -90,7 +90,7 @@ def BuyCryptoBet(bet):
     print('Buying at: ' + str(buyprice))
     buyquantity = round(bet / buyprice, 8)  # Amount of money we're spending / asking price of coin
     print('Quantity buying: ' + str(buyquantity))
-    orderinfo = r.order_buy_crypto_limit('BTC', buyquantity, buyprice)
+    orderinfo = r.order_buy_crypto_limit(CryptoSymbol, buyquantity, buyprice)
     orderid = orderinfo['id']
     print('Order placed!')
     print('')
@@ -110,11 +110,11 @@ def BuyCryptoImmediately(bet):
 
     print('Starting Immediate Buy procedure...')
     print('Money to bet: ' + str(bet))
-    price = r.get_crypto_quote('BTC')
+    price = r.get_crypto_quote(CryptoSymbol)
     ask_price = float(price['ask_price'])
     print('Asking: ' + str(ask_price))
     print('Placing order...')
-    orderinfo = r.order_buy_crypto_by_price('BTC', bet)
+    orderinfo = r.order_buy_crypto_by_price(CryptoSymbol, bet)
     orderid = orderinfo['id']
     Wait(orderid, True, True)
     print('Bought!')
@@ -134,14 +134,14 @@ def SellCryptoImmediately():
     print('Total amount bet: ' + str(paid))
     priceboughtat = round(paid / quantityavailable, 2)
     print('Price bought at: ' + str(priceboughtat))
-    price = r.get_crypto_quote('BTC')
-    ask_price = float(price['ask_price'])
-    print('Asking: ' + str(ask_price))
-    loss = paid - (paid * (ask_price / priceboughtat))
+    price = r.get_crypto_quote(CryptoSymbol)
+    bid_price = float(price['bid_price'])
+    print('Bidding: ' + str(bid_price))
+    loss = paid - (paid * (bid_price / priceboughtat))
     loss = round(loss, 2)
     print('Estimated losses: ' + str(loss))
     print('Placing order...')
-    orderinfo = r.order_sell_crypto_by_quantity('BTC', quantityavailable)
+    orderinfo = r.order_sell_crypto_by_quantity(CryptoSymbol, quantityavailable, priceType='bid_price')
     orderid = orderinfo['id']
     Wait(orderid, True, False)
     print('Sold!')
@@ -186,12 +186,12 @@ def StartCryptoContract():
     print('Starting contract creation procedure...')
     quantityavailable = GetQuantityAvailable()
     print('Quantity available: ' + str(quantityavailable))
-    paid = GetBet()
+    paid = GetBet() / ActiveContracts
     priceboughtat = round(paid / quantityavailable, 2)
     print('Bought at: ' + str(priceboughtat))
-    sellprice = round(priceboughtat * (1.000 + BasePercent), 2)
+    sellprice = round(priceboughtat * (1.0000 + BasePercent), 2)
     print('Selling at: ' + str(sellprice))
-    orderinfo = (r.order_sell_crypto_limit('BTC', quantityavailable, sellprice, 'gtc'))
+    orderinfo = (r.order_sell_crypto_limit(CryptoSymbol, quantityavailable, sellprice, 'gtc'))
     print('Contract created!')
     print('')
     orderid = orderinfo['id']
@@ -202,25 +202,24 @@ def ContractWait():
     """Waits until TimeInterval is reached or a contract is sold. Periodically checks contracts"""
 
     time = 0
+    print(ContractIDs)
     while time < TimeInterval:
         remove = []
-        for contract in Contracts:
-            if GetState(contract) == 'filled':
-                print('')
-                print('Contract sold!')
-                remove.append(contract)
+        for contractid in ContractIDs:
+            if GetState(contractid) == 'filled':
+                remove.append(contractid)
         if len(remove) > 0:
-            for contract in remove:
-                Contracts.remove(contract)
             print('')
+            print('Contract(s) sold!')
+            for contractid in remove:
+                ContractIDs.remove(contractid)
             return True
         else:
             print('\rWaiting for contracts to sell. Time: ' + str(time) + 's', end='')
-            t.sleep(30)
-            time += 30
+            t.sleep(15)
+            time += 15
     print('')
     print('No contracts sold.')
-    print('')
     return False
 
 
@@ -251,6 +250,7 @@ print('Making money printer go brrr..')
 t.sleep(0.5)
 Login()
 print('We\'re in.\n')
+CryptoSymbol = 'LTC'
 print('Checking orders..')
 if len(r.get_all_open_crypto_orders()) != 0:
     print('Canceling orders..')
@@ -354,27 +354,28 @@ elif choice == '2':
 
     ActiveContracts = 0
     MaxContracts = 5
-    BetAmount = 10.00
-    BasePercent = 0.0020
+    BetAmount = 20.00
+    BasePercent = 0.0050
     LoseStreakToQuit = 4
     LoseStreak = 0
-    TimeInterval = 2400  # Seconds
-    Contracts = [5]
+    TimeInterval = 3600  # Seconds
+    ContractIDs = []
 
     while True:
         if ActiveContracts < MaxContracts:  # Add a contract
             print('Let''s add a contract.')
             BuyCryptoImmediately(BetAmount)
-            Contracts.append(StartCryptoContract())
+            ActiveContracts += 1
+            ContractIDs.append(StartCryptoContract())
             sold = ContractWait()  # Let contract(s) cook
-            ActiveContracts = len(Contracts)
+            ActiveContracts = len(ContractIDs)
             if sold:
                 LoseStreak = 0
             print('')
         else:  # Max contracts, drop one
             print('Let''s drop a contract.')
-            CancelOrders(Contracts[0])
-            Contracts = Contracts[1:4]
+            CancelOrders(ContractIDs[0])
+            ContractIDs = ContractIDs[1:4]
             ActiveContracts -= 1
             LoseStreak += 1
             print('')
